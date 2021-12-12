@@ -1,0 +1,125 @@
+---
+title: "ANA 515"
+author: "Ganapathy Subramanian"
+date: "12/11/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(janeaustenr)
+library(stringr)
+library(tidytext)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(reshape2)
+library(wordcloud)
+```
+
+```{r, include = TRUE}
+#1.	Discuss the business problem/goal
+#The aim of this project is to build a sentiment analysis model which will allow us to categorize words based on their sentiments, that is whether they are positive, negative and also the magnitude of it. 
+#Sentiment Analysis is a process of extracting opinions that have different polarities. By polarities, we mean positive, negative or neutral. It is also known as opinion mining and polarity detection. With the help of sentiment analysis, you can find out the nature of opinion that is reflected in documents, websites, social media feed, etc. Sentiment Analysis is a type of classification where the data is classified into different classes. These classes can be binary in nature (positive or negative) or, they can have multiple classes (happy, sad, angry, etc.).
+```
+
+```{r, include=TRUE}
+#2.	identify where the dataset was retrieved from 
+#https://data-flair.training/blogs/data-science-r-sentiment-analysis-project/
+#http://ai.stanford.edu/~amaas/data/sentiment/
+```
+
+
+```{r, include = TRUE}
+# 3.	identify the code that imported and saved your dataset in R 
+tidy_data <- austen_books() %>%
+ group_by(book) %>%
+ mutate(linenumber = row_number(),
+   chapter = cumsum(str_detect(text, regex("^chapter [\\divxlc]", 
+                          ignore_case = TRUE)))) %>%
+ungroup() %>%
+unnest_tokens(word, text)
+```
+
+```{r, include = TRUE}
+# 4.	Describe your data set 
+#Number of Rows
+nrow(tidy_data)
+#Number of Columns
+ncol(tidy_data)
+print(tidy_data)
+#Mean
+mean(tidy_data$linenumber)
+#Standard Deviation
+sd(tidy_data$chapter)
+#Maximum
+max(tidy_data$linenumber)
+#Minimum
+min(tidy_data$chapter)
+
+```
+```{r, include = TRUE}
+#5.	discuss any data preparation, missing values and errors 
+# The table clearly has the column names and data filled with all the preparation done. May be there could have been a clearer explanation of the word column which has some numbers in them. Usually numbers does not fall under either negative or positive sentiment values. So they could have deleted those numerical values from the column.
+```
+
+```{r, include = TRUE}
+#6.	discuss the modeling
+#In order to build our project on sentiment analysis, we will make use of the tidytext package that comprises of sentiment lexicons that are present in the dataset of ‘sentiments’.
+#We will make use of three general purpose lexicons like –
+
+#AFINN
+#bing
+#loughran
+#These three lexicons make use of the unigrams. Unigrams are a type of n-gram model that consists of a sequence of 1 item, that is, a word collected from a given textual data. In the AFINN lexicon model scores the words in a range from -5 to 5. The increase in negativity corresponds the negative sentiment whereas an increase in positivity corresponds the positive one. The bing lexicon model on the other hand, classifies the sentiment into a binary category of negative or positive. And finally, the loughran model that performs analysis of the shareholder’s reports. In this project, we will make use of the bing lexicons to extract the sentiments out of our data. We can retrieve these lexicons using the get_sentiments() function.
+```
+
+
+```{r, include = TRUE}
+# 7.produce and discuss the output 
+# Collect all positive words like well, good, happy etc., together and store in "positive_senti" variable
+positive_senti <- get_sentiments("bing") %>%
+ filter(sentiment == "positive")
+tidy_data %>%
+ filter(book == "Emma") %>%
+ semi_join(positive_senti) %>%
+ count(word, sort = TRUE)
+#The data is classified into two categories: positive and negative using the spread function and then the mutate function is used to find the total difference between positive words and negative words. We use the "Emma" book for this chunk.
+bing <- get_sentiments("bing")
+Emma_sentiment <- tidy_data %>%
+ inner_join(bing) %>%
+ count(book = "Emma" , index = linenumber %/% 80, sentiment) %>%
+ spread(sentiment, n, fill = 0) %>%
+ mutate(sentiment = positive - negative)
+```
+
+```{r, include = TRUE}
+# 8.provide explanation with any visuals 
+# This "Emma" book is represented in the form of a barchart with both negative and positive sides of the graph. The positive side shows the total of positive sentiment words and the negative graph represents the negative sentiment words
+ggplot(Emma_sentiment, aes(index, sentiment, fill = book)) +
+ geom_bar(stat = "identity", show.legend = TRUE) +
+ facet_wrap(~book, ncol = 2, scales = "free_x")
+# Let us now count the most repeated commonly used positive and negative words in this function.
+counting_words <- tidy_data %>%
+ inner_join(bing) %>%
+ count(word, sentiment, sort = TRUE)
+head(counting_words)
+#This graph is similar to the previous graph. But we are assigning a sentiment score for each of the repeated positive and negative words on each side of the novel.For example "well" is the most commonly used positive word and "pain" is the least commonly used negative word.
+counting_words %>%
+ filter(n > 150) %>%
+ mutate(n = ifelse(sentiment == "negative", -n, n)) %>%
+ mutate(word = reorder(word, n)) %>%
+ ggplot(aes(word, n, fill = sentiment))+
+ geom_col() +
+ coord_flip() +
+ labs(y = "Sentiment Score")
+# We use a wordcloud to visually show the most used positive and negative words as a cluster. This is one of the good examples of data visualization. Even though it does not give us any data for further analysis, but it will help a layman understand the purpose of the project. "comparison.cloud" function is used for this chunk.
+tidy_data %>%
+ inner_join(bing) %>%
+ count(word, sentiment, sort = TRUE) %>%
+ acast(word ~ sentiment, value.var = "n", fill = 0) %>%
+ comparison.cloud(colors = c("red", "dark green"),
+          max.words = 100)
+```
+
+
+
